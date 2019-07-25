@@ -104,6 +104,7 @@ Pull requests are welcome!
    python3 preprocess.py --dataset ljspeech
    ```
      * Use `--dataset blizzard` for Blizzard data
+     * 默认LJspeech在本目录下，否则--base_dir lj_dir
 
 4. **Train a model**
    ```
