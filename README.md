@@ -134,9 +134,10 @@ Pull requests are welcome!
    to `localhost:9000` and type what you want to speak. Alternately, you can
    run [eval.py](eval.py) at the command line:
    ```
-   python3 eval.py --checkpoint ~/tacotron/logs-tacotron/model.ckpt-185000
+   CUDA_VISIBLE_DEVICES=0 python3 eval.py --checkpoint ~/tacotron/logs-tacotron/model.ckpt-185000
    ```
    If you set the `--hparams` flag when training, set the same value here.
+   use gpu devices to eval ,so change os.environ in eval.py 
 
 
 ## Notes and Common Issues
