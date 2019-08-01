@@ -116,6 +116,11 @@ Pull requests are welcome!
    Hyperparameters should generally be set to the same values at both training and eval time.
    The default hyperparameters are recommended for LJ Speech and other English-language data.
    See [TRAINING_DATA.md](TRAINING_DATA.md) for other languages.
+   
+   从某个节点断点继续训练
+   ```
+   python train.py --restore_step 1000
+   ```
 
 
 5. **Monitor with Tensorboard** (optional)
