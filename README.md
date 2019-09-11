@@ -166,6 +166,7 @@ Pull requests are welcome!
     
     If your training examples are longer, you will see an error like this:
     `Incompatible shapes: [32,1340,80] vs. [32,1000,80]`
+    hparams.py modify max_iters* output_per_step搭配组合
     
     To fix this, you can set a larger value of `max_iters` by passing `--hparams="max_iters=300"` to
     train.py (replace "300" with a value based on how long your audio is and the formula above).
