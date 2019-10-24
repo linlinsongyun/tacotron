@@ -6,44 +6,41 @@ from datasets import blizzard, ljspeech
 from hparams import hparams
 
 
-def preprocess_blizzard(args):
-  in_dir = os.path.join(args.base_dir, 'Blizzard2012')
+
+
+def write_metadata(agrs):
   out_dir = os.path.join(args.base_dir, args.output)
   os.makedirs(out_dir, exist_ok=True)
-  metadata = blizzard.build_from_path(in_dir, out_dir, args.num_workers, tqdm=tqdm)
-  write_metadata(metadata, out_dir)
-
-
-def preprocess_ljspeech(args):
-  in_dir = os.path.join(args.base_dir, 'LJSpeech-1.1')
-  out_dir = os.path.join(args.base_dir, args.output)
-  os.makedirs(out_dir, exist_ok=True)
-  metadata = ljspeech.build_from_path(in_dir, out_dir, args.num_workers, tqdm=tqdm)
-  write_metadata(metadata, out_dir)
-
-
-def write_metadata(metadata, out_dir):
-  with open(os.path.join(out_dir, 'train.txt'), 'w', encoding='utf-8') as f:
-    for m in metadata:
-      f.write('|'.join([str(x) for x in m]) + '\n')
-  frames = sum([m[2] for m in metadata])
-  hours = frames * hparams.frame_shift_ms / (3600 * 1000)
-  print('Wrote %d utterances, %d frames (%.2f hours)' % (len(metadata), frames, hours))
-  print('Max input length:  %d' % max(len(m[3]) for m in metadata))
-  print('Max output length: %d' % max(m[2] for m in metadata))
+  spk_list = {'biaobei':1, 'ts':2}
+  with open(os.path.join(out_dir, args.save_txt), 'w', encoding='utf-8') as f:
+    for ppgs in os,listdir(args.ppgs_dir):
+      ppgs_name = ppgs.split('.npy')[0]
+      lpc32 = pps_name + '.mel.npy'
+      lcp32_path = os.path.join(args.lpc32_dir, lpc32)
+      if os.path.isfile(lpc32_path):
+        if 'biaobei' in ppgs_name:
+          spk_id = 1
+          spk = 'biaobei'
+        elif 'ts' in ppgs_name:
+          spk_id = 2
+          spk = 'ts'
+          
+        f.write('%s|%s|%s|%s|%d\n'%(ppgs, ppgs, lpc32, spk, spk_id))
+      else:
+        os.system('echo %s>>wrong.txt'%lpc32)
+        print('%s is none'%lpc32_path)
 
 
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--base_dir', default=os.path.expanduser('~/tacotron'))
   parser.add_argument('--output', default='training')
-  parser.add_argument('--dataset', required=True, choices=['blizzard', 'ljspeech'])
+  parser.add_argument('--save_txt', default='data_list.txt')
+  parser.add_argument('--ppgs_dir')
+  parser.add_argument('--lpc32_dir')
   parser.add_argument('--num_workers', type=int, default=cpu_count())
   args = parser.parse_args()
-  if args.dataset == 'blizzard':
-    preprocess_blizzard(args)
-  elif args.dataset == 'ljspeech':
-    preprocess_ljspeech(args)
+  write_meta(args)
 
 
 if __name__ == "__main__":
