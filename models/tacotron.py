@@ -14,7 +14,7 @@ class Tacotron():
     self._hparams = hparams
 
 
-  def initialize(self, inputs, input_lengths, mel_targets=None, linear_targets=None):
+  def initialize(self, speaker_id, mask, inputs, input_lengths, mel_targets=None):
     '''Initializes the model for inference.
 
     Sets "mel_outputs", "linear_outputs", and "alignments" fields.
@@ -35,17 +35,20 @@ class Tacotron():
       is_training = linear_targets is not None
       batch_size = tf.shape(inputs)[0]
       hp = self._hparams
-
-      # Embeddings
-      embedding_table = tf.get_variable(
-        'embedding', [len(symbols), hp.embed_depth], dtype=tf.float32,
-        initializer=tf.truncated_normal_initializer(stddev=0.5))
-      embedded_inputs = tf.nn.embedding_lookup(embedding_table, inputs)          # [N, T_in, embed_depth=256]
-
+      
+      
+      speaker_embedded_table = tf.get_variable( 'embedding', [hp.num_speaker, hp.speaker_embedding_size], dtype=tf.float32,
+                                               initializer=tf.truncated_normal_initializer(stddev=0.5))
+      speaker_embed = tf.nn.embedding_lookup(speaker_embedded_table, speaker_id)
+      
       # Encoder
       prenet_outputs = prenet(embedded_inputs, is_training, hp.prenet_depths)    # [N, T_in, prenet_depths[-1]=128]
       encoder_outputs = encoder_cbhg(prenet_outputs, input_lengths, is_training, # [N, T_in, encoder_depth=256]
                                      hp.encoder_depth)
+      speaker_embed = tf.expand_dims(speaker_embed, 1)
+      encoder_steps = tf.gather(input_lengths, tf.argmax(input_lengths))
+      speaker_embed = tf.tile(speaker_embed, [1, encoder_steps, 1])
+      encoder_outputs = tf.concat([encoder_outputs, speaker_embed], axis=2)
 
       # Attention
       attention_cell = AttentionWrapper(
@@ -83,10 +86,8 @@ class Tacotron():
       # Reshape outputs to be one output per entry
       mel_outputs = tf.reshape(decoder_outputs, [batch_size, -1, hp.num_mels])   # [N, T_out, M]
 
-      # Add post-processing CBHG:
-      post_outputs = post_cbhg(mel_outputs, hp.num_mels, is_training,            # [N, T_out, postnet_depth=256]
-                               hp.postnet_depth)
-      linear_outputs = tf.layers.dense(post_outputs, hp.num_freq)                # [N, T_out, F]
+      
+      outputs = tf.layers.dense(mel_outputs, hp.num_freq)                # [N, T_out, F]
 
       # Grab alignments from the final decoder state:
       alignments = tf.transpose(final_decoder_state[0].alignment_history.stack(), [1, 2, 0])
@@ -94,10 +95,9 @@ class Tacotron():
       self.inputs = inputs
       self.input_lengths = input_lengths
       self.mel_outputs = mel_outputs
-      self.linear_outputs = linear_outputs
+      self.outputs =outputs
       self.alignments = alignments
       self.mel_targets = mel_targets
-      self.linear_targets = linear_targets
       log('Initialized Tacotron model. Dimensions: ')
       log('  embedding:               %d' % embedded_inputs.shape[-1])
       log('  prenet out:              %d' % prenet_outputs.shape[-1])
@@ -107,20 +107,17 @@ class Tacotron():
       log('  decoder cell out:        %d' % decoder_cell.output_size)
       log('  decoder out (%d frames):  %d' % (hp.outputs_per_step, decoder_outputs.shape[-1]))
       log('  decoder out (1 frame):   %d' % mel_outputs.shape[-1])
-      log('  postnet out:             %d' % post_outputs.shape[-1])
-      log('  linear out:              %d' % linear_outputs.shape[-1])
+      log('  out:                     %d' % outputs.shape[-1])
 
 
   def add_loss(self):
     '''Adds loss to the model. Sets "loss" field. initialize must have been called.'''
     with tf.variable_scope('loss') as scope:
       hp = self._hparams
-      self.mel_loss = tf.reduce_mean(tf.abs(self.mel_targets - self.mel_outputs))
-      l1 = tf.abs(self.linear_targets - self.linear_outputs)
-      # Prioritize loss for frequencies under 3000 Hz.
-      n_priority_freq = int(3000 / (hp.sample_rate * 0.5) * hp.num_freq)
-      self.linear_loss = 0.5 * tf.reduce_mean(l1) + 0.5 * tf.reduce_mean(l1[:,:,0:n_priority_freq])
-      self.loss = self.mel_loss + self.linear_loss
+      outputs = tf.multiply(self.outputs, self.mask)
+      mel_loss = tf.abs(self.mel_targets - outputs)
+      self.mel_loss = tf.reduce_mean(mel_loss)
+      self.loss = self.mel_loss
 
 
   def add_optimizer(self, global_step):
